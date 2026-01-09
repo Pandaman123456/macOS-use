@@ -4,6 +4,9 @@ import socket
 import asyncio
 import logging
 from typing import Dict, Union, Optional
+import sys
+import threading
+import time
 
 import gradio as gr
 
@@ -16,13 +19,15 @@ from gradio_app.src.ui.interface import (
 
 def create_interface(app_instance: MacOSUseGradioApp):
     """Create the Gradio interface with all components."""
-    with gr.Blocks(title="macOS-use Interface") as demo:
-        gr.Markdown("# Make Mac apps accessible for AI agents (Beta)")
+    # Use generic title that looks good in a window
+    with gr.Blocks(title="AI Assistant", theme=gr.themes.Soft()) as demo:
+        # No header for the app feel
         
-        with gr.Tab("Agent"):
+        with gr.Tab("Assistant"):
             agent_components = create_agent_tab(app_instance)
+            # Unpack 8 components (updated interface.py)
             task_input, refine_prompt_btn, share_prompt, max_steps, max_actions, \
-            run_button, stop_button, result_output, terminal_output = agent_components
+            run_button, stop_button, chatbot = agent_components
 
         with gr.Tab("Automations"):
             automation_components = create_automations_tab(app_instance)
@@ -30,7 +35,7 @@ def create_interface(app_instance: MacOSUseGradioApp):
             automation_list, agent_prompt, add_agent_btn, remove_agent_btn, \
             run_automation_btn, agents_list, automation_output = automation_components
         
-        with gr.Tab("Configuration"):
+        with gr.Tab("Settings"):
             config_components = create_configuration_tab(app_instance)
             llm_provider, llm_model, api_key, share_terminal_cfg = config_components
 
@@ -187,6 +192,7 @@ Only return the refined prompt text, nothing else.
             api_name=False
         )
 
+        # Updated run_button click for chatbot
         run_button.click(
             fn=run_agent_wrapper,
             inputs=[
@@ -199,10 +205,9 @@ Only return the refined prompt text, nothing else.
                 share_prompt
             ],
             outputs=[
-                terminal_output,
+                chatbot,
                 run_button,
-                stop_button,
-                result_output
+                stop_button
             ],
             queue=True,
             api_name=False
@@ -222,13 +227,13 @@ Only return the refined prompt text, nothing else.
             api_name=False
         )
         
+        # Updated stop_button click for chatbot
         stop_button.click(
             fn=app_instance.stop_agent,
             outputs=[
-                terminal_output,
+                chatbot,
                 run_button,
-                stop_button,
-                result_output
+                stop_button
             ]
         )
 
@@ -279,19 +284,57 @@ def main():
     demo = create_interface(app)
     demo.queue(default_concurrency_limit=1)  # Limit to one concurrent task
     
+    # Check if we should run in "Window" mode (pywebview)
+    # We try to import webview; if successful, we run in app mode.
+    # Otherwise we run in standard browser mode.
+
     try:
-        demo.launch(
-            server_name="0.0.0.0",
-            server_port=port,
-            pwa=True,
-            share=False,
-            show_error=True
+        import webview
+        has_webview = True
+    except ImportError:
+        has_webview = False
+        print("pywebview not found, running in browser mode.")
+
+    if has_webview:
+        # Start Gradio in a separate thread
+        def start_gradio():
+            try:
+                demo.launch(
+                    server_name="0.0.0.0",
+                    server_port=port,
+                    prevent_thread_lock=False, # We want this thread to block
+                    show_error=True
+                )
+            except Exception as e:
+                print(f"Error launching application: {e}")
+                # Try finding an available port
+                new_port = find_available_port(port + 1)
+                demo.launch(
+                    server_name="0.0.0.0",
+                    server_port=new_port,
+                    prevent_thread_lock=False,
+                    show_error=True
+                )
+
+        t = threading.Thread(target=start_gradio)
+        t.daemon = True
+        t.start()
+
+        # Give Gradio a moment to start
+        time.sleep(2)
+
+        # Create a native window
+        webview.create_window(
+            'Mac AI Assistant',
+            f'http://localhost:{port}',
+            width=500,
+            height=800,
+            resizable=True
         )
-    except Exception as e:
-        print(f"Error launching application: {e}")
-        # If we can't get the exact port, try finding an available one
+        webview.start()
+    else:
+        # Standard launch
         try:
-            port = find_available_port(port + 1)  # Start looking from next port
             demo.launch(
                 server_name="0.0.0.0",
                 server_port=port,
@@ -300,7 +343,18 @@ def main():
                 show_error=True
             )
         except Exception as e:
-            print(f"Failed to launch on alternative port: {e}")
+            print(f"Error launching application: {e}")
+            try:
+                port = find_available_port(port + 1)
+                demo.launch(
+                    server_name="0.0.0.0",
+                    server_port=port,
+                    pwa=True,
+                    share=False,
+                    show_error=True
+                )
+            except Exception as e:
+                print(f"Failed to launch on alternative port: {e}")
 
 if __name__ == "__main__":
-    main() 
+    main()
