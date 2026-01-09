@@ -2,205 +2,72 @@ import gradio as gr
 from typing import Dict, List, Any
 
 def create_agent_tab(app_instance) -> List[gr.components.Component]:
-    with gr.Row():
-        # Left Column (scale=2)
-        with gr.Column(scale=2):
-            gr.Markdown("### Examples: How to prompt the agent")            
-            # Category Selection Buttons
-            with gr.Row():
-                quick_tasks_btn = gr.Button("Quick Tasks", variant="secondary")
-                multi_step_btn = gr.Button("Multi-Step Tasks", variant="primary")
-                advanced_btn = gr.Button("Advanced Workflows", variant="secondary")
-            
-            gr.Markdown("This is <span style='color: red; font-weight: bold;'>NOT a chat</span> - Check our prompt examples!")
-            
-            with gr.Group():
-                with gr.Row():
-                    gr.Markdown("<div style='text-align: center; width: 100%; padding-top: 3px;'>Task Prompt</div>")
-                    refine_prompt_btn = gr.Button("Refine Prompt", size="sm")
-                with gr.Row():
-                    task_input = gr.Textbox(
-                        label="",
-                        placeholder="Enter task (e.g., 'open calculator')",
-                        lines=3
-                    )
+    """
+    Creates the main chat interface for the agent.
+    """
+    with gr.Column(elem_classes="agent-container"):
+        # Main Chat Area
+        chatbot = gr.Chatbot(
+            label="Agent",
+            elem_id="chatbot",
+            bubble_full_width=False,
+            height=500,
+            type="messages"
+        )
 
-            share_prompt = gr.Checkbox(
-                label="Share prompt (only!) anonymously",
-                value=app_instance.preferences["share_prompt"],
-                info="Sharing your prompt (and prompt only) ANONYMOUSLY will help us improve our agent."
+        # Input Area
+        with gr.Row():
+            task_input = gr.Textbox(
+                show_label=False,
+                placeholder="What would you like me to do on your Mac?",
+                lines=2,
+                scale=8,
+                container=False,
+                autofocus=True
             )
+            run_button = gr.Button("Run", variant="primary", scale=1, size="lg")
+            stop_button = gr.Button("Stop", variant="stop", scale=1, size="lg", interactive=False)
+
+        # Settings & Advanced Options (Hidden by default)
+        with gr.Accordion("Advanced Options & Examples", open=False):
+            with gr.Row():
+                refine_prompt_btn = gr.Button("Refine Prompt", size="sm")
+                share_prompt = gr.Checkbox(
+                    label="Share prompt anonymously",
+                    value=app_instance.preferences.get("share_prompt", False)
+                )
+            
             with gr.Row():
                 max_steps = gr.Slider(
-                    minimum=1,
-                    maximum=100,
-                    value=25,
-                    step=1,
-                    label="Max Run Steps"
+                    minimum=1, maximum=100, value=25, step=1, label="Max Steps"
                 )
                 max_actions = gr.Slider(
-                    minimum=1,
-                    maximum=20,
-                    value=5,
-                    step=1,
-                    label="Max Actions per Step"
+                    minimum=1, maximum=20, value=5, step=1, label="Max Actions/Step"
                 )
+
+            # Examples
+            gr.Markdown("### Examples")
             with gr.Row():
-                run_button = gr.Button("Run", variant="primary")
-                stop_button = gr.Button("Stop", interactive=False)
+                quick_tasks = app_instance.example_categories.get("Quick Tasks", [])[:4]
+                for example in quick_tasks:
+                    gr.Button(example["name"], size="sm", variant="secondary").click(
+                        fn=lambda p=example["prompt"]: p,
+                        outputs=task_input
+                    )
 
-        # Right Column (scale=3)
-        with gr.Column(scale=3):
-            result_output = gr.Textbox(
-                label="Result",
-                lines=3,
-                interactive=False,
-                autoscroll=True
-            )
-            
-            with gr.Accordion("Steps & Actions", open=False) as terminal_accordion:
-                terminal_output = gr.Textbox(
-                    label="Terminal Output",
-                    lines=25,
-                    interactive=False,
-                    autoscroll=True
-                )
-            
-            # Dynamic Example Containers
-            with gr.Column() as examples_box:
-                gr.Markdown("#### Task prompts examples, Try all of them!")
-                
-                # Level description markdown that will be updated
-                level_description = gr.Markdown(visible=False)
-                
-                # Scrollable container for all example categories
-                with gr.Column(elem_classes="scrollable-container") as examples_container:
-                    # Quick Tasks Container
-                    with gr.Column(visible=False) as quick_tasks_container:
-                        quick_tasks = app_instance.example_categories.get("Quick Tasks", [])
-                        quick_buttons = []
-                        for example in quick_tasks:
-                            btn = gr.Button(
-                                value=example["name"],
-                                variant="secondary"
-                            )
-                            quick_buttons.append(btn)
-                            btn.click(
-                                fn=lambda p=example["prompt"]: p,
-                                outputs=task_input
-                            )
-
-                    # Multi-Step Tasks Container
-                    with gr.Column(visible=True) as multi_step_container:
-                        multi_step_tasks = app_instance.example_categories.get("Multi-Step Tasks", [])
-                        for task in multi_step_tasks:
-                            # Task name as a header
-                            gr.Markdown(f"### {task['name']}")
-                            # Buttons in a horizontal row below the task name
-                            if "levels" in task:
-                                with gr.Row():
-                                    for level_dict in task["levels"]:
-                                        level = level_dict["level"]
-                                        prompt = level_dict["prompt"]
-                                        level_descriptions = {
-                                            "Bad": "Might work, but since this is not a chat, it's probably not the best way to do it.",
-                                            "Good": "Will probably work, good enough for short prompt tasks",
-                                            "Expert": "Most likely to work, for complex apps and tasks, use that!"
-                                        }
-                                        btn = gr.Button(
-                                            value=f"{level} Example",
-                                            variant="secondary"
-                                        )
-                                        btn.click(
-                                            fn=lambda p=prompt, l=level, desc=level_descriptions.get(level, ""): (p, desc),
-                                            outputs=[task_input, level_description]
-                                        ).then(
-                                            fn=lambda: gr.update(visible=True),
-                                            outputs=level_description
-                                        )
-                                # Add some spacing between tasks
-                                gr.Markdown("---")
-
-                    # Advanced Workflows Container
-                    with gr.Column(visible=False) as advanced_tasks_container:
-                        advanced_tasks = app_instance.example_categories.get("Advanced Workflows", [])
-                        for example in advanced_tasks:
-                            btn = gr.Button(
-                                value=example["name"],
-                                variant="secondary"
-                            )
-                            btn.click(
-                                fn=lambda p=example["prompt"]: p,
-                                outputs=task_input
-                            )
-
-            # Add CSS for scrollable container to the interface
-            gr.HTML("""
-                <style>
-                    .scrollable-container {
-                        height: 400px;
-                        overflow-y: auto;
-                        padding-right: 10px;
-                        margin-top: 10px;
-                    }
-                    /* Style the scrollbar */
-                    .scrollable-container::-webkit-scrollbar {
-                        width: 8px;
-                    }
-                    .scrollable-container::-webkit-scrollbar-track {
-                        background: #f1f1f1;
-                        border-radius: 4px;
-                    }
-                    .scrollable-container::-webkit-scrollbar-thumb {
-                        background: #888;
-                        border-radius: 4px;
-                    }
-                    .scrollable-container::-webkit-scrollbar-thumb:hover {
-                        background: #555;
-                    }
-                </style>
-            """)
-
-            # Category selection handlers
-            def update_category_visibility(category):
-                return {
-                    quick_tasks_container: gr.update(visible=category == "Quick Tasks"),
-                    advanced_tasks_container: gr.update(visible=category == "Advanced Workflows"),
-                    multi_step_container: gr.update(visible=category == "Multi-Step Tasks"),
-                    quick_tasks_btn: gr.update(variant="primary" if category == "Quick Tasks" else "secondary"),
-                    multi_step_btn: gr.update(variant="primary" if category == "Multi-Step Tasks" else "secondary"),
-                    advanced_btn: gr.update(variant="primary" if category == "Advanced Workflows" else "secondary"),
-                    examples_box: gr.update(visible=True)
-                }
-
-            # Set up category button click handlers
-            quick_tasks_btn.click(
-                fn=lambda: update_category_visibility("Quick Tasks"),
-                outputs=[
-                    quick_tasks_container, advanced_tasks_container, multi_step_container,
-                    quick_tasks_btn, multi_step_btn, advanced_btn, examples_box
-                ]
-            )
-            
-            multi_step_btn.click(
-                fn=lambda: update_category_visibility("Multi-Step Tasks"),
-                outputs=[
-                    quick_tasks_container, advanced_tasks_container, multi_step_container,
-                    quick_tasks_btn, multi_step_btn, advanced_btn, examples_box
-                ]
-            )
-            
-            advanced_btn.click(
-                fn=lambda: update_category_visibility("Advanced Workflows"),
-                outputs=[
-                    quick_tasks_container, advanced_tasks_container, multi_step_container,
-                    quick_tasks_btn, multi_step_btn, advanced_btn, examples_box
-                ]
-            )
+    # Custom CSS for the native app feel
+    gr.HTML("""
+        <style>
+            .agent-container { padding: 0px; }
+            #chatbot { border: none; background-color: transparent; }
+            footer { display: none !important; }
+            .gradio-container { max_width: 100% !important; margin: 0; padding: 0; }
+        </style>
+    """)
 
     return [
         task_input, refine_prompt_btn, share_prompt, max_steps, max_actions,
-        run_button, stop_button, result_output, terminal_output
+        run_button, stop_button, chatbot
     ]
 
 def create_automations_tab(app_instance) -> List[gr.components.Component]:
@@ -293,4 +160,4 @@ def create_configuration_tab(app_instance) -> List[gr.components.Component]:
         info="Sharing terminal output helps us understand how the agent performs tasks."
     )
     
-    return [llm_provider, llm_model, api_key, share_terminal] 
+    return [llm_provider, llm_model, api_key, share_terminal]
