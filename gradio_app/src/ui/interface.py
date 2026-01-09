@@ -10,7 +10,7 @@ def create_agent_tab(app_instance) -> List[gr.components.Component]:
         chatbot = gr.Chatbot(
             label="Agent",
             elem_id="chatbot",
-            bubble_full_width=False,
+            # bubble_full_width removed as it is deprecated/removed in Gradio 6.x
             height=500,
             type="messages"
         )
