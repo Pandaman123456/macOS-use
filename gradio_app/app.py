@@ -20,7 +20,8 @@ from gradio_app.src.ui.interface import (
 def create_interface(app_instance: MacOSUseGradioApp):
     """Create the Gradio interface with all components."""
     # Use generic title that looks good in a window
-    with gr.Blocks(title="AI Assistant", theme=gr.themes.Soft()) as demo:
+    # theme removed from Blocks constructor as it is deprecated in Gradio 6.x
+    with gr.Blocks(title="AI Assistant") as demo:
         # No header for the app feel
         
         with gr.Tab("Assistant"):
@@ -304,6 +305,7 @@ def main():
                     server_port=port,
                     prevent_thread_lock=False, # We want this thread to block
                     show_error=True
+                    # theme=gr.themes.Soft() # theme parameter passed to launch() if needed
                 )
             except Exception as e:
                 print(f"Error launching application: {e}")
@@ -314,6 +316,7 @@ def main():
                     server_port=new_port,
                     prevent_thread_lock=False,
                     show_error=True
+                    # theme=gr.themes.Soft()
                 )
 
         t = threading.Thread(target=start_gradio)
@@ -341,6 +344,7 @@ def main():
                 pwa=True,
                 share=False,
                 show_error=True
+                # theme=gr.themes.Soft()
             )
         except Exception as e:
             print(f"Error launching application: {e}")
@@ -352,6 +356,7 @@ def main():
                     pwa=True,
                     share=False,
                     show_error=True
+                    # theme=gr.themes.Soft()
                 )
             except Exception as e:
                 print(f"Failed to launch on alternative port: {e}")

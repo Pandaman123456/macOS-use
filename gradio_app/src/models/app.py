@@ -28,7 +28,7 @@ class MacOSUseGradioApp:
         self.log_queue = queue.Queue()
         self.setup_logging()
         self.terminal_buffer = []
-        self.chat_history = []  # For storing structured chat messages
+        self.chat_history = []  # For storing chat messages (list of lists/tuples)
         self.message_queue = asyncio.Queue() # Queue for passing messages from callback to generator
         self.automations = {}
         self.preferences_file = Path(__file__).parent.parent.parent / 'preferences.json'
@@ -80,7 +80,7 @@ class MacOSUseGradioApp:
             self._cleanup_state()
             
             # Add a system message indicating stop
-            stop_msg = {"role": "assistant", "content": "🛑 Agent stopped by user."}
+            stop_msg = [None, "🛑 Agent stopped by user."]
             return (
                 self.chat_history + [stop_msg],
                 gr.update(interactive=True),
@@ -306,7 +306,8 @@ class MacOSUseGradioApp:
                 except:
                     content += f"- `{action}`\n"
 
-            message = {"role": "assistant", "content": content}
+            # Format as a tuple for standard Gradio Chatbot (None for user, content for bot)
+            message = [None, content]
 
             # Put into queue for the generator to pick up
             self.message_queue.put_nowait(message)
@@ -319,9 +320,9 @@ class MacOSUseGradioApp:
         try:
             final_result = history.final_result()
             if final_result:
-                msg = {"role": "assistant", "content": f"✅ **Task Completed!**\n\n{final_result}"}
+                msg = [None, f"✅ **Task Completed!**\n\n{final_result}"]
             else:
-                msg = {"role": "assistant", "content": "✅ **Task Completed!**"}
+                msg = [None, "✅ **Task Completed!**"]
             self.message_queue.put_nowait(msg)
             # Signal end of stream
             self.message_queue.put_nowait(None)
@@ -343,8 +344,8 @@ class MacOSUseGradioApp:
         """Run the agent and yield chat history updates"""
         self._cleanup_state()
         
-        # Initial User Message
-        user_msg = {"role": "user", "content": task}
+        # Initial User Message: [task, None] means user said 'task', bot said nothing yet
+        user_msg = [task, None]
         self.chat_history.append(user_msg)
         yield (
             self.chat_history,
@@ -354,7 +355,8 @@ class MacOSUseGradioApp:
 
         try:
             if not task.strip():
-                self.chat_history.append({"role": "assistant", "content": "⚠️ Please enter a task description."})
+                # Append error message as bot response
+                self.chat_history.append([None, "⚠️ Please enter a task description."])
                 yield self.chat_history, gr.update(interactive=True), gr.update(interactive=False)
                 return
 
@@ -362,7 +364,7 @@ class MacOSUseGradioApp:
             llm = get_llm(llm_provider, llm_model, api_key)
 
             if not llm:
-                self.chat_history.append({"role": "assistant", "content": f"❌ Failed to initialize {llm_provider} LLM."})
+                self.chat_history.append([None, f"❌ Failed to initialize {llm_provider} LLM."])
                 yield self.chat_history, gr.update(interactive=True), gr.update(interactive=False)
                 return
 
@@ -408,12 +410,12 @@ class MacOSUseGradioApp:
                 try:
                     await agent_task
                 except Exception as e:
-                    error_msg = {"role": "assistant", "content": f"❌ **Error:** {str(e)}"}
+                    error_msg = [None, f"❌ **Error:** {str(e)}"]
                     self.chat_history.append(error_msg)
                     yield self.chat_history, gr.update(interactive=True), gr.update(interactive=False)
 
         except Exception as e:
-            error_msg = {"role": "assistant", "content": f"❌ **System Error:** {str(e)}"}
+            error_msg = [None, f"❌ **System Error:** {str(e)}"]
             self.chat_history.append(error_msg)
             yield self.chat_history, gr.update(interactive=True), gr.update(interactive=False)
         finally:
