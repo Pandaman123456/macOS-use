@@ -23,6 +23,9 @@ source .venv/bin/activate
 
 # Install/Update dependencies
 echo "⬇️  Checking dependencies..."
+# Install the core mlx-use library (in editable mode)
+pip install -e . --quiet
+# Install app-specific dependencies
 pip install -r gradio_app/requirements.txt --quiet
 
 # Run the application
