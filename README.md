@@ -22,13 +22,35 @@ macOS-use enables AI agents to interact with your Macbook [see it in action!](#d
 
 ⚠️ Important: Review the [Warning](#warning) section before proceeding. <br>
 
+### 🖥️ Run the Desktop App (GUI)
+
+We provide a simple launcher for the AI Assistant interface:
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/browser-use/macOS-use.git && cd macOS-use
+    ```
+2.  **Set up API Keys:**
+    ```bash
+    cp .env.example .env
+    open ./.env # Add your OpenAI/Anthropic keys
+    ```
+3.  **Run the App:**
+    Double-click the `run_app.command` file in Finder, or run in terminal:
+    ```bash
+    ./run_app.command
+    ```
+    This will install dependencies automatically and launch the Assistant window.
+
+---
+
 ### With pip:
 
 ```bash
 pip install mlx-use
 ```
 
-### From github
+### From github (CLI / Developers)
 
 Clone first
 <br>
